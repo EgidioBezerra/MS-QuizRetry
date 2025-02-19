@@ -1,3 +1,4 @@
-# MasterStudy QuizRetry addons to
+# MasterStudy QuizRetry Addon
 
-Corresponde ã um addon para o plugin MasterStudy LMS, escrito para permitir que os usuarios refaçam os quizes.
+It a addon for MasterStudy LMS Wordpress plugin.
+This addon allow users to retake finished quizes even if after the user passes the test.
