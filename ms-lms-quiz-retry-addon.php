@@ -2,7 +2,7 @@
 /*
 Plugin Name: MasterStudy LMS Quiz Retry Addon
 Description: Adiciona a funcionalidade de re-tentativa em quizzes do MasterStudy LMS, utilizando o Course Builder para definir a opção e aproveitando o objeto global quiz_data para obter o quiz ID.
-Version: Beta 1.8
+Version: Beta 1.9
 Author: 
 License: GPLv3
 */
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /* 1. Registra o campo customizado "Allow Quiz Retry" no Course Builder.
-   Esse campo adiciona um checkbox no editor do quiz, salvando o valor na meta "allow-quiz-retry". */
+   Este campo adiciona um checkbox no editor de quiz, salvando o valor na meta "allow-quiz-retry". */
 function ms_lms_add_retry_custom_field( $custom_fields ) {
     $custom_fields[] = array(
         'type'    => 'checkbox',
@@ -24,37 +24,35 @@ function ms_lms_add_retry_custom_field( $custom_fields ) {
 }
 add_filter( 'masterstudy_lms_quiz_custom_fields', 'ms_lms_add_retry_custom_field' );
 
-/* 2. Tenta processar blocos do tipo "core/shortcode" para extrair o quiz ID. */
-add_filter('render_block', 'ms_lms_render_shortcode_block', 10, 2);
-function ms_lms_render_shortcode_block($block_content, $block) {
-    if ( isset($block['blockName']) && $block['blockName'] === 'core/shortcode' ) {
-        // Processa o shortcode manualmente
-        $processed = do_shortcode( $block['innerHTML'] );
-        if ( preg_match('/\[stm_lms_quiz_online\s+id\s*=\s*["\']?(\d+)["\']?\]/i', $processed, $matches) ) {
-            global $ms_lms_quiz_id;
-            $ms_lms_quiz_id = intval($matches[1]);
-            error_log("Quiz ID extraído do bloco shortcode: " . $ms_lms_quiz_id);
-        }
-        return $processed;
+/* 2. Utiliza o filtro "pre_do_shortcode_tag" para capturar o ID do quiz
+   antes que o shortcode seja processado. */
+add_filter('pre_do_shortcode_tag', 'ms_lms_pre_do_shortcode_tag', 10, 4);
+function ms_lms_pre_do_shortcode_tag($return, $tag, $atts, $m) {
+    if ($tag === 'stm_lms_quiz_online') {
+        global $ms_lms_quiz_id;
+        $atts = shortcode_atts( array( 'id' => 0 ), $atts, 'stm_lms_quiz_online' );
+        $ms_lms_quiz_id = intval($atts['id']);
+        error_log("Quiz ID capturado via pre_do_shortcode_tag: " . $ms_lms_quiz_id);
     }
-    return $block_content;
+    return $return; // Não altera o resultado do shortcode
 }
 
-/* 3. Fallback: Se o shortcode não for processado corretamente, use o filtro 'the_content' para extrair o quiz ID. */
+/* 3. Fallback: Se o shortcode não for processado corretamente (por exemplo, aparece como literal),
+   utiliza o filtro "the_content" para tentar extrair o ID do quiz. */
 function ms_lms_extract_quiz_id_from_content_fallback($content) {
     global $ms_lms_quiz_id;
-    if (empty($ms_lms_quiz_id) && strpos($content, '[stm_lms_quiz_online') !== false) {
+    if ( empty($ms_lms_quiz_id) && strpos($content, '[stm_lms_quiz_online') !== false ) {
         if ( preg_match('/\[stm_lms_quiz_online\s+id\s*=\s*["\']?(\d+)["\']?\]/i', $content, $matches) ) {
             $ms_lms_quiz_id = intval($matches[1]);
-            error_log("Quiz ID extraído via fallback the_content: " . $ms_lms_quiz_id);
+            error_log("Quiz ID capturado via fallback the_content: " . $ms_lms_quiz_id);
         }
     }
     return $content;
 }
 add_filter('the_content', 'ms_lms_extract_quiz_id_from_content_fallback', 20);
 
-/* 4. Função para extrair o quiz ID pela URL (último segmento).
-   Esse método funciona bem em cursos, onde a URL termina com o ID. */
+/* 4. Fallback: Extrai o quiz ID pela URL (último segmento).
+   Esse método funciona bem em cursos, quando a URL termina com o ID. */
 function ms_lms_get_quiz_id_from_url() {
     if ( isset( $_SERVER['REQUEST_URI'] ) ) {
         $uri = trim( $_SERVER['REQUEST_URI'], '/' );
@@ -68,24 +66,22 @@ function ms_lms_get_quiz_id_from_url() {
 }
 
 /* 5. Define a variável global para o quiz ID.
-   Prioriza o valor extraído pelo shortcode (ou pelo fallback em the_content) e, se não existir, usa a URL. */
+   Prioriza o valor capturado pelo shortcode/fallback; se não existir, usa o valor da URL. */
 global $ms_lms_quiz_id;
 if ( empty( $ms_lms_quiz_id ) ) {
-    // Usamos o hook 'wp' para garantir que o ambiente já esteja carregado
     add_action('wp', function() {
         global $ms_lms_quiz_id;
         $ms_lms_quiz_id = ms_lms_get_quiz_id_from_url();
-        error_log("ms_lms_quiz_id definido via URL: " . $ms_lms_quiz_id);
+        error_log("Quiz ID definido via URL fallback: " . $ms_lms_quiz_id);
     });
 }
 
 /* 6. Enfileira o script e passa as variáveis para o JavaScript.
-   Utiliza o quiz ID definido (por shortcode/fallback ou URL) e recupera o meta "allow-quiz-retry". */
+   Usa o quiz ID definido (por shortcode, fallback ou URL) e lê o meta "allow-quiz-retry". */
 function ms_lms_enqueue_retry_script() {
     global $ms_lms_quiz_id;
     $quiz_id = ($ms_lms_quiz_id) ? $ms_lms_quiz_id : get_queried_object_id();
     
-    // Recupera o meta "allow-quiz-retry" como array
     $meta_value = get_post_meta( $quiz_id, 'allow-quiz-retry', false );
     $allow_flag = (!empty($meta_value) && in_array('1', $meta_value));
     
