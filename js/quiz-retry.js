@@ -1,7 +1,7 @@
 jQuery(document).ready(function($) {
     console.log("msLmsQuizRetry no início:", msLmsQuizRetry);
     
-    // Se a opção de retake estiver ativada, injeta o botão
+    // Se a opção de retake estiver ativada, injeta o botão de retake
     if (msLmsQuizRetry.allow) {
         var interval = setInterval(function() {
             var $container = $('.masterstudy-course-player-quiz__result-container');
