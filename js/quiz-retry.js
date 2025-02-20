@@ -1,11 +1,11 @@
 jQuery(document).ready(function($) {
     console.log("msLmsQuizRetry no início:", msLmsQuizRetry);
-
-    // Se a opção de retake estiver ativada, injetamos o botão de retake
+    
+    // Se a opção de retake estiver ativada, injeta o botão
     if (msLmsQuizRetry.allow) {
         var interval = setInterval(function() {
             var $container = $('.masterstudy-course-player-quiz__result-container');
-            console.log("Procurando contêiner de resultado, encontrado:", $container.length);
+            console.log("Procurando contêiner de resultado, encontrados:", $container.length);
             if ($container.length > 0) {
                 if ($('#quiz-result-retake').length === 0) {
                     var buttonHtml = '<div class="masterstudy-course-player-quiz__result-retake">' +
